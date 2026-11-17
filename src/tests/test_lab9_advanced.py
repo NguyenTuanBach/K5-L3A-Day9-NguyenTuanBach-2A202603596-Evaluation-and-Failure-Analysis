@@ -74,3 +74,16 @@ def test_slice_check_blocks_a_slice_below_floor():
     spec = dict(SPEC, slices=[{"name": "denial", "metric": "pass_rate", "min": 0.9, "blocking": True}])
     blocked, _ = gate.slice_check(_report(rows, {"pass_rate": 0.75}), base, spec)
     assert blocked == ["slice:denial/pass_rate"]
+
+
+def test_integrity_recomputes_pass_5_and_pass_hat_from_rows():
+    from lab9 import gate
+
+    spec = dict(SPEC, pass_k=[2])
+    rows = copy.deepcopy(ROWS)
+    rows[0]["pass_rate"] = False          # item E-000 fails on seed 1 only: flaky
+    honest = {"pass_rate": 0.875, "pass_5": 0.75, "pass_hat_2": 0.75, "pass_at_2": 1.0}
+    base = _report(copy.deepcopy(ROWS), {"pass_rate": 1.0, "pass_5": 1.0, "pass_hat_2": 1.0, "pass_at_2": 1.0})
+    assert gate.integrity_check(_report(rows, honest), base, spec) == []
+    faked = dict(honest, pass_hat_2=1.0)
+    assert any("pass_hat_2" in p for p in gate.integrity_check(_report(rows, faked), base, spec))

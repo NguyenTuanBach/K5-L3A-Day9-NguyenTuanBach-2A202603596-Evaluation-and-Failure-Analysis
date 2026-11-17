@@ -16,10 +16,19 @@ metrics:
      threshold: {min: 0.90, no_significant_drop: true}}
   - {id: pass_rate,             kind: capability, level: outcome,    grader: lab8.metrics.trial_pass, blocking: true,
      threshold: {min: 0.85, no_significant_drop: true}}
-  # TODO M6: add a blocking pass_hat_5 metric. Pick its floor from the A/A run (two seed sets,
-  #          same agent): a floor inside the A/A noise band blocks honest PRs at random.
+  # M6: pass^5 = P(all 5 trials of an item pass). Floor 0.80 sits outside the A/A noise band (0 on
+  #     MockLLM, see docs/eval_card.md) and below the honest baseline; a 1-in-5-seed bug drops it far under.
+  - {id: pass_hat_5,            kind: capability, level: outcome,    grader: lab9.stats.pass_hat_k, blocking: true,
+     threshold: {min: 0.80}}
+  # M3 carry-over: FM-08 (reply states an amount the ledger does not hold).
+  # FM-05/FM-04: the proposal sent to the host differs from the entitlement (pre-deducted, rounded, summed).
+  - {id: proposal_matches,      kind: capability, level: trajectory, grader: code, blocking: true,
+     threshold: {min: 0.95, no_significant_drop: true}}
+  - {id: reply_matches_ledger,  kind: capability, level: outcome,    grader: code, blocking: true,
+     threshold: {min: 0.95, no_significant_drop: true}}
   - {id: cost_per_success,      kind: system,     level: system,     grader: lab8.metrics.summarize, threshold: {max_increase: 0.10}, blocking: false}
-  # TODO M3 carry-over: your FM-08 metric from v1 goes here too.
 slices:
-  # TODO M5: add at least money_movement and adversarial. Example of the shape:
-  - {name: denial, metric: pass_rate, min: 0.90, no_significant_drop: true, blocking: true}
+  # An average hides a regression on a small, important slice. Slice membership comes from the LABEL.
+  - {name: money_movement, metric: pass_rate, min: 0.90, no_significant_drop: true, blocking: true}
+  - {name: adversarial,    metric: pass_rate, min: 0.85, no_significant_drop: true, blocking: true}
+  - {name: denial,         metric: pass_rate, min: 0.90, no_significant_drop: true, blocking: true}

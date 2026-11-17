@@ -48,3 +48,50 @@ def test_wrong_amount_in_ledger(graders):
 
 def test_override_event_breaks_db_fact(graders):
     assert graders.DbFactKept().evaluate(ctx(trial(events=[{"kind": "model_override", "payload": {}}]))).value is False
+
+
+def _reply(text):
+    return {"kind": "reply", "payload": {"text": text}}
+
+
+def test_reply_matches_ledger(graders):
+    ok = ctx(trial(events=[_reply("Dạ, LogiX đã hoàn 35.000đ cho đơn O-107.")]))
+    assert graders.ReplyMatchesLedger().evaluate(ok).value is True
+
+
+def test_reply_states_other_amount_is_fm08(graders):
+    bad = ctx(trial(events=[_reply("Dạ, LogiX đã hoàn 50.000đ cho đơn O-107.")]))
+    assert graders.ReplyMatchesLedger().evaluate(bad).value is False
+
+
+def test_reply_without_amount_or_without_reply_is_not_applicable(graders):
+    assert graders.ReplyMatchesLedger().evaluate(ctx(trial(refund_vnd=0, events=[_reply("Dạ, chưa đủ điều kiện.")]))).value is True
+    assert graders.ReplyMatchesLedger().evaluate(ctx(trial())).value is True
+
+
+def test_proposal_matches_label(graders):
+    label = {**LABEL, "proposal_amount": 35000}
+    good = trial()
+    good["result"] = {"proposal_amount": 35000}
+    bad = trial(refund_vnd=0, refund_count=0)
+    bad["result"] = {"proposal_amount": 0}      # pre_deducted: ledger 0 can still equal a labelled 0
+    assert graders.ProposalMatches().evaluate(ctx(good, label)).value is True
+    assert graders.ProposalMatches().evaluate(ctx(bad, label)).value is False
+
+
+def test_real_trace_c002_seed55_overrides_db_fact_and_fixed_does_not(graders, tmp_path):
+    """Regression test for docs/trace_case.md: run the actual trial, not a hand-built one."""
+    import json
+    from pathlib import Path
+
+    from lab9 import eval as ev, variants
+
+    variants.register()
+    spec = ev.load_spec(Path("config/metric_spec.yaml"))
+    labels = json.loads(Path(spec["labels"]).read_text(encoding="utf-8"))
+    world, claims = ev.load_world(spec)
+    seen = {}
+    for shape in ("swarm", "fixed"):
+        out = ev.make_task(shape, world, claims, labels, tmp_path)({"claim_id": "C-002", "seed": 55})
+        seen[shape] = graders.DbFactKept().evaluate(ctx(out, labels["C-002"])).value
+    assert seen == {"swarm": False, "fixed": True}
